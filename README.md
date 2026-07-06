@@ -71,7 +71,10 @@ this if needed, referencing the updated artwork.
 
 ## Credits / stack
 
-- [MindAR](https://hiukim.github.io/mind-ar-js-doc/) for image tracking
-- [Three.js](https://threejs.org/) (used internally by MindAR's three.js renderer)
+- [MindAR](https://hiukim.github.io/mind-ar-js-doc/) v1.1.5 for image tracking
+  (intentionally pinned to this version — v1.2.0+ switched to requiring ES
+  modules/import maps instead of a plain `window.MINDAR` global, which isn't
+  compatible with this file's plain-script setup. v1.1.5 also bundles its own
+  Three.js internally, so no separate Three.js script is needed.)
 - No build step — everything is plain HTML/CSS/JS, so any static host works
   (GitHub Pages, Netlify, Vercel, etc.)

@@ -4,8 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>הגנת המגדל | סמינר הקיבוצים</title>
-<script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.5/dist/mindar-image-three.prod.js"></script>
 <style>
   :root{
     --ink:#0b1020;
@@ -314,6 +313,9 @@
 
   async function initMindAR(){
     try{
+      if(!window.MINDAR || !window.MINDAR.IMAGE){
+        throw new Error('ספריית ה-AR לא נטענה מה-CDN (בדקו חיבור אינטרנט)');
+      }
       const {MindARThree} = window.MINDAR.IMAGE;
       mindarThree = new MindARThree({
         container: arContainer,
@@ -349,9 +351,9 @@
   }
 
   // project a local anchor-space point (x,y,0) to screen pixel coords
-  const _v = (window.THREE) ? new THREE.Vector3() : null;
   function projectLocal(lx, ly, lz){
     lz = lz||0;
+    const THREE = window.MINDAR.THREE;
     const v = new THREE.Vector3(lx, ly, lz);
     v.applyMatrix4(anchor.group.matrixWorld);
     v.project(camera);
