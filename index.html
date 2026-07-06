@@ -211,7 +211,7 @@
       לכם 3 חיים ו-30 שניות – כמה נקודות תספיקו לצבור?
     </div>
     <button class="cta-btn" id="startBtn">התחילו הגנה 🚀</button>
-    <div id="permHint">המשחק ישתמש במצלמה שלכם.</div>
+    <div id="permHint">לחיצה על הכפתור תבקש הרשאת מצלמה ותפעיל את ה-AR.</div>
   </div>
 
   <div id="endScreen" class="screen hidden">
@@ -332,19 +332,19 @@
       mindReady = true;
       window.__mindarResize = ()=>{ try{ renderer.setSize(W,H); }catch(e){} };
       renderer.setSize(W,H);
-      loadingScreen.classList.add('hidden');
-      startScreen.classList.remove('hidden');
       renderer.setAnimationLoop(()=>{
         renderer.render(scene, camera);
       });
     }catch(e){
-      loadingScreen.classList.add('hidden');
-      startScreen.classList.remove('hidden');
       camFallback.style.display = 'block';
       camStatus.style.display = 'block';
-      camStatus.textContent = window.isSecureContext
-        ? '🚫 לא ניתן היה להפעיל את המצלמה/מעקב AR'
+      let reason = window.isSecureContext
+        ? '🚫 שגיאה בהפעלת המצלמה/AR'
         : '📵 יש לפתוח דרך קישור https:// כדי להפעיל מצלמה';
+      if(e && e.name === 'NotAllowedError') reason = '🚫 הגישה למצלמה נחסמה — אשרו הרשאת מצלמה בדפדפן ונסו שוב';
+      else if(e && e.name === 'NotFoundError') reason = '📷 לא נמצאה מצלמה במכשיר';
+      else if(e && e.message) reason += ` (${e.message})`;
+      camStatus.textContent = reason;
     }
   }
 
@@ -716,9 +716,23 @@
     if(!running) requestAnimationFrame(idleRender);
   }
 
-  startBtn.addEventListener('click', ()=>{
-    trackStatus.classList.remove('hidden');
-    startGame();
+  startBtn.addEventListener('click', async ()=>{
+    if(mindReady){
+      trackStatus.classList.remove('hidden');
+      startGame();
+      return;
+    }
+    startScreen.classList.add('hidden');
+    loadingScreen.classList.remove('hidden');
+    ensureAudio();
+    await initMindAR();
+    loadingScreen.classList.add('hidden');
+    if(mindReady){
+      trackStatus.classList.remove('hidden');
+      startGame();
+    } else {
+      startScreen.classList.remove('hidden');
+    }
   });
   retryBtn.addEventListener('click', ()=>{
     startGame();
@@ -735,7 +749,8 @@
   });
 
   requestAnimationFrame(idleRender);
-  initMindAR();
+  loadingScreen.classList.add('hidden');
+  startScreen.classList.remove('hidden');
 })();
 </script>
 </body>
