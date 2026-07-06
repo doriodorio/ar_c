@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>הגנת המגדל | סמינר הקיבוצים</title>
+<script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"></script>
+<style>
+  :root{
+    --ink:#0b1020;
+    --neon-cyan:#2fe6d8;
+    --neon-purple:#a24fe0;
+    --neon-yellow:#f4c430;
+    --neon-red:#ef4444;
+    --panel:#0e1530ee;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{
+    margin:0; padding:0; width:100%; height:100%;
+    background:var(--ink);
+    font-family: 'Segoe UI', Arial, sans-serif;
+    overflow:hidden;
+    touch-action:none;
+    color:#fff;
+  }
+  #stage{
+    position:relative;
+    width:100%; height:100%;
+    max-width:520px;
+    margin:0 auto;
+    overflow:hidden;
+    background:#050810;
+  }
+  #arContainer{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+  }
+  #arContainer video{
+    object-fit:cover !important;
+  }
+  #arContainer canvas{
+    object-fit:cover !important;
+  }
+  #camFallback{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    background:
+      radial-gradient(circle at 30% 15%, #ffcf7a55, transparent 40%),
+      linear-gradient(180deg,#1a2450 0%, #2b1e4a 40%, #4a2b3d 70%, #6b3a2e 100%);
+    display:none;
+    z-index:1;
+  }
+  #dimOverlay{
+    position:absolute; inset:0;
+    background:linear-gradient(180deg, rgba(5,8,16,0.15) 0%, rgba(5,8,16,0.05) 40%, rgba(5,8,16,0.45) 100%);
+    pointer-events:none;
+    z-index:5;
+  }
+  #gameCanvas{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    display:block;
+    z-index:10;
+  }
+
+  #hud{
+    position:absolute; top:0; left:0; right:0;
+    display:flex; justify-content:space-between; align-items:flex-start;
+    padding:14px 14px 0 14px;
+    z-index:20;
+    pointer-events:none;
+  }
+  .hud-chip{
+    background:var(--panel);
+    border:1px solid #ffffff22;
+    border-radius:14px;
+    padding:8px 14px;
+    font-weight:700;
+    font-size:15px;
+    backdrop-filter: blur(6px);
+    display:flex; align-items:center; gap:8px;
+    box-shadow:0 4px 20px #00000055;
+  }
+  #scoreChip{ color:var(--neon-yellow); }
+  #timeChip{ color:var(--neon-cyan); }
+  #livesChip{ color:var(--neon-red); letter-spacing:2px; }
+
+  .screen{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center;
+    padding:32px 24px;
+    z-index:50;
+    background:
+      radial-gradient(circle at 50% 20%, #3a2a6633, transparent 55%),
+      linear-gradient(180deg, #0b1020ee 0%, #0b1020fa 100%);
+  }
+  .hidden{ display:none !important; }
+
+  .logo-row{
+    background:#000; color:#fff; font-weight:800; font-size:13px;
+    padding:8px 16px; border-radius:8px; letter-spacing:0.5px; margin-bottom:6px;
+    display:inline-flex; align-items:center; gap:8px;
+  }
+  .sub-eyebrow{ font-size:11px; color:#9aa3c0; margin-bottom:22px; }
+  .title-main{
+    font-size:38px; font-weight:900; line-height:1.1;
+    background:linear-gradient(90deg,var(--neon-yellow), #ffe27a);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    margin:0 0 6px 0; text-shadow:0 0 30px #f4c43055;
+  }
+  .title-sub{ font-size:17px; color:#d7dcf5; margin-bottom:26px; font-weight:600; }
+  .briefing{ font-size:14px; color:#aab0d0; max-width:320px; line-height:1.7; margin-bottom:28px; }
+  .cta-btn{
+    background:linear-gradient(90deg,var(--neon-cyan), #17b8ac);
+    color:#04201d; border:none; font-weight:900; font-size:18px;
+    padding:16px 46px; border-radius:40px; cursor:pointer;
+    box-shadow:0 8px 30px #2fe6d855; transition:transform .15s ease;
+  }
+  .cta-btn:active{ transform:scale(0.95); }
+  .cta-btn.secondary{
+    background:transparent; color:#d7dcf5; border:1px solid #ffffff44;
+    box-shadow:none; padding:12px 30px; font-size:14px; margin-top:14px;
+  }
+  #permHint{ font-size:12px; color:#7d84a8; margin-top:18px; max-width:280px; }
+
+  .stat-block{ display:flex; gap:22px; margin:8px 0 30px 0; }
+  .stat{
+    background:var(--panel); border:1px solid #ffffff22; border-radius:16px;
+    padding:14px 22px; min-width:90px;
+  }
+  .stat .num{ font-size:30px; font-weight:900; color:var(--neon-yellow); }
+  .stat .lab{ font-size:11px; color:#9aa3c0; margin-top:2px; }
+
+  #qrNote{
+    position:absolute; bottom:14px; left:0; right:0; text-align:center;
+    font-size:11px; color:#6a7096; z-index:20;
+  }
+
+  #flashOverlay{
+    position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; z-index:40;
+  }
+
+  #camStatus{
+    position:absolute; top:14px; left:50%; transform:translateX(-50%);
+    background:#00000099; color:#f4c430; font-size:11px; padding:6px 12px;
+    border-radius:20px; z-index:60; max-width:88%; text-align:center;
+    border:1px solid #f4c43044; display:none;
+  }
+  #trackStatus{
+    position:absolute; bottom:64px; left:50%; transform:translateX(-50%);
+    background:#00000099; font-size:11px; font-weight:700; padding:6px 14px;
+    border-radius:20px; z-index:30; border:1px solid #ffffff22;
+    transition: color .2s ease, border-color .2s ease;
+  }
+  #trackStatus.searching{ color:#f4c430; border-color:#f4c43044; }
+  #trackStatus.locked{ color:#2fe6d8; border-color:#2fe6d844; }
+  #trackStatus.frozen{ color:#a24fe0; border-color:#a24fe044; }
+
+  #loadingScreen{
+    position:absolute; inset:0; z-index:70;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:#0b1020; gap:14px;
+  }
+  .spinner{
+    width:36px; height:36px; border-radius:50%;
+    border:3px solid #ffffff22; border-top-color:var(--neon-cyan);
+    animation:spin 0.9s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  @media (max-height: 620px){
+    .title-main{ font-size:30px; }
+    .briefing{ margin-bottom:16px; }
+    .stat-block{ margin-bottom:16px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <div id="arContainer"></div>
+  <div id="camFallback"></div>
+  <div id="dimOverlay"></div>
+  <canvas id="gameCanvas"></canvas>
+  <div id="flashOverlay"></div>
+  <div id="camStatus"></div>
+  <div id="trackStatus" class="searching hidden">📡 מחפשים את הרקע...</div>
+
+  <div id="hud" class="hidden">
+    <div class="hud-chip" id="livesChip">♥ ♥ ♥</div>
+    <div class="hud-chip" id="scoreChip">0 נק'</div>
+    <div class="hud-chip" id="timeChip">30</div>
+  </div>
+
+  <div id="loadingScreen">
+    <div class="spinner"></div>
+    <div style="font-size:13px;color:#9aa3c0;">טוען את המשחק...</div>
+  </div>
+
+  <div id="startScreen" class="screen hidden">
+    <div class="logo-row">✈ סמינר הקיבוצים</div>
+    <div class="sub-eyebrow">בית הספר לעיצוב טוטאלי · משחקים ברצינות</div>
+    <div class="title-main">הגנת המגדל</div>
+    <div class="title-sub">חייזרים תוקפים את מגדל שלום מאיר!</div>
+    <div class="briefing">
+      כוונו את המצלמה לרקע כדי שהמשחק יזהה אותו וייצור את העולם התלת-ממדי.<br>
+      אחר כך ספינות יתקפו את המגדל מכל הכיוונים.<br>
+      כוונו את הכוונת שבמרכז המסך לעבר ספינה, ולחצו על המסך כדי לפגוע בה.<br>
+      לכם 3 חיים ו-30 שניות – כמה נקודות תספיקו לצבור?
+    </div>
+    <button class="cta-btn" id="startBtn">התחילו הגנה 🚀</button>
+    <div id="permHint">המשחק ישתמש במצלמה שלכם.</div>
+  </div>
+
+  <div id="endScreen" class="screen hidden">
+    <div class="logo-row">✈ סמינר הקיבוצים</div>
+    <div class="title-main" id="endTitle">המגדל ניצל!</div>
+    <div class="title-sub" id="endSub">כל הכבוד, מגן/ת המגדל</div>
+    <div class="stat-block">
+      <div class="stat"><div class="num" id="finalScore">0</div><div class="lab">נקודות</div></div>
+      <div class="stat"><div class="num" id="finalHits">0</div><div class="lab">פגיעות</div></div>
+    </div>
+    <button class="cta-btn" id="retryBtn">שחקו שוב 🔁</button>
+    <button class="cta-btn secondary" id="shareBtn">שתפו את הניקוד</button>
+  </div>
+
+  <div id="qrNote" class="hidden">סרקו שוב כדי לשחק • המכללה לחינוך ולאמנויות מס' 1 בישראל</div>
+</div>
+
+<script>
+(function(){
+  const stage = document.getElementById('stage');
+  const arContainer = document.getElementById('arContainer');
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const camFallback = document.getElementById('camFallback');
+  const flashOverlay = document.getElementById('flashOverlay');
+  const hud = document.getElementById('hud');
+  const scoreChip = document.getElementById('scoreChip');
+  const timeChip = document.getElementById('timeChip');
+  const livesChip = document.getElementById('livesChip');
+  const startScreen = document.getElementById('startScreen');
+  const endScreen = document.getElementById('endScreen');
+  const startBtn = document.getElementById('startBtn');
+  const retryBtn = document.getElementById('retryBtn');
+  const shareBtn = document.getElementById('shareBtn');
+  const endTitle = document.getElementById('endTitle');
+  const endSub = document.getElementById('endSub');
+  const finalScore = document.getElementById('finalScore');
+  const finalHits = document.getElementById('finalHits');
+  const trackStatus = document.getElementById('trackStatus');
+  const camStatus = document.getElementById('camStatus');
+  const loadingScreen = document.getElementById('loadingScreen');
+
+  // ---------- Assets ----------
+  const shipImg = new Image();
+  shipImg.src = "assets/ship.png";
+  const MIND_URL = "assets/targets.mind";
+
+  // ---------- Sound ----------
+  let actx;
+  function ensureAudio(){ if(!actx){ actx = new (window.AudioContext||window.webkitAudioContext)(); } }
+  function beep({freq=440, dur=0.12, type='square', vol=0.15, slideTo=null}){
+    if(!actx) return;
+    const o = actx.createOscillator();
+    const g = actx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, actx.currentTime);
+    if(slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, actx.currentTime+dur);
+    g.gain.setValueAtTime(vol, actx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime+dur);
+    o.connect(g); g.connect(actx.destination);
+    o.start(); o.stop(actx.currentTime+dur);
+  }
+  function sfxShoot(){ beep({freq:900, slideTo:200, dur:0.1, type:'square', vol:0.12}); }
+  function sfxHit(){ beep({freq:220, slideTo:40, dur:0.28, type:'sawtooth', vol:0.22}); }
+  function sfxHurt(){ beep({freq:140, slideTo:60, dur:0.35, type:'triangle', vol:0.25}); }
+  function sfxStart(){ beep({freq:400, slideTo:800, dur:0.25, type:'sine', vol:0.18}); }
+  function sfxOver(){ beep({freq:500, slideTo:100, dur:0.6, type:'sine', vol:0.2}); }
+  function sfxLaser(){ beep({freq:600, slideTo:150, dur:0.15, type:'sawtooth', vol:0.05}); }
+
+  // ---------- Canvas sizing ----------
+  let W, H, DPR;
+  function resize(){
+    const rect = stage.getBoundingClientRect();
+    DPR = Math.min(window.devicePixelRatio||1, 2);
+    W = rect.width; H = rect.height;
+    canvas.width = W*DPR; canvas.height = H*DPR;
+    canvas.style.width = W+'px'; canvas.style.height = H+'px';
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    if(window.__mindarResize) window.__mindarResize();
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ---------- Building geometry (in MindAR anchor-local units,
+  // derived directly from the backdrop artwork's pixel coordinates:
+  // image is 1500x1500, plane spans x:[-0.5,0.5], y:[-0.5,0.5], y-up) ----------
+  const IMG_SIZE = 1500;
+  function toLocal(px, py){ return { x: px/IMG_SIZE - 0.5, y: 0.5 - py/IMG_SIZE }; }
+  const B_TL = toLocal(799, 510);
+  const B_TR = toLocal(1435, 510);
+  const B_BL = toLocal(799, 1500);
+  const B_BR = toLocal(1435, 1500);
+  const TARGET = toLocal(1117, 787); // ~28% down the tower, the "impact zone"
+
+  // ---------- MindAR setup ----------
+  let mindarThree, renderer, scene, camera, anchor;
+  let targetVisible = false;
+  let lastVisibleTs = 0;
+  let mindReady = false;
+
+  async function initMindAR(){
+    try{
+      const {MindARThree} = window.MINDAR.IMAGE;
+      mindarThree = new MindARThree({
+        container: arContainer,
+        imageTargetSrc: MIND_URL,
+        uiScanning: false,
+        uiLoading: false,
+      });
+      renderer = mindarThree.renderer;
+      scene = mindarThree.scene;
+      camera = mindarThree.camera;
+      anchor = mindarThree.addAnchor(0);
+      anchor.onTargetFound = ()=>{ targetVisible = true; lastVisibleTs = performance.now(); };
+      anchor.onTargetLost = ()=>{ targetVisible = false; };
+
+      await mindarThree.start();
+      mindReady = true;
+      window.__mindarResize = ()=>{ try{ renderer.setSize(W,H); }catch(e){} };
+      renderer.setSize(W,H);
+      loadingScreen.classList.add('hidden');
+      startScreen.classList.remove('hidden');
+      renderer.setAnimationLoop(()=>{
+        renderer.render(scene, camera);
+      });
+    }catch(e){
+      loadingScreen.classList.add('hidden');
+      startScreen.classList.remove('hidden');
+      camFallback.style.display = 'block';
+      camStatus.style.display = 'block';
+      camStatus.textContent = window.isSecureContext
+        ? '🚫 לא ניתן היה להפעיל את המצלמה/מעקב AR'
+        : '📵 יש לפתוח דרך קישור https:// כדי להפעיל מצלמה';
+    }
+  }
+
+  // project a local anchor-space point (x,y,0) to screen pixel coords
+  const _v = (window.THREE) ? new THREE.Vector3() : null;
+  function projectLocal(lx, ly, lz){
+    lz = lz||0;
+    const v = new THREE.Vector3(lx, ly, lz);
+    v.applyMatrix4(anchor.group.matrixWorld);
+    v.project(camera);
+    return {
+      x: (v.x+1)/2 * W,
+      y: (1-v.y)/2 * H,
+      z: v.z
+    };
+  }
+
+  function buildingCorners(){
+    return {
+      tl: projectLocal(B_TL.x, B_TL.y),
+      tr: projectLocal(B_TR.x, B_TR.y),
+      bl: projectLocal(B_BL.x, B_BL.y),
+      br: projectLocal(B_BR.x, B_BR.y)
+    };
+  }
+
+  function updateTrackStatusUI(ts){
+    if(trackStatus.classList.contains('hidden')) return;
+    trackStatus.classList.remove('locked','searching','frozen');
+    if(targetVisible){
+      trackStatus.classList.add('locked');
+      trackStatus.textContent = '🔒 העולם מיושר לרקע';
+    } else if(lastVisibleTs>0 && ts-lastVisibleTs < 4000){
+      trackStatus.classList.add('frozen');
+      trackStatus.textContent = '🧊 שמירת מיקום אחרון...';
+    } else {
+      trackStatus.classList.add('searching');
+      trackStatus.textContent = '📡 מחפשים את הרקע...';
+    }
+  }
+
+  // ---------- Game state ----------
+  let running = false;
+  let score = 0, hits = 0, lives = 3, timeLeft = 30;
+  let ships = [];
+  let particles = [];
+  let laserBeams = [];
+  let muzzleFlash = 0;
+  let lastSpawn = 0;
+  let spawnInterval = 1500;
+  let lastTick = 0;
+  let timerAccum = 0;
+  let elapsed = 0;
+  const RETICLE_R = 46;
+
+  function rand(a,b){ return a + Math.random()*(b-a); }
+
+  function spawnShip(){
+    const angle = rand(0, Math.PI*2);
+    const dist0 = rand(0.5, 1.1);
+    const duration = rand(7, 12);
+    ships.push({
+      angle, dist: dist0, dist0, duration,
+      alive:true, size: rand(46,60), wobbleSeed: Math.random()*10,
+      nextFire: rand(1.2, 2.5)
+    });
+  }
+
+  function shipLocalPos(s){
+    return {
+      x: TARGET.x + s.dist*Math.cos(s.angle),
+      y: TARGET.y + s.dist*Math.sin(s.angle)
+    };
+  }
+
+  function resetGame(){
+    score=0; hits=0; lives=3; timeLeft=30; elapsed=0;
+    ships=[]; particles=[]; laserBeams=[];
+    spawnInterval = 1500;
+    lastSpawn = performance.now();
+    lastTick = performance.now();
+    timerAccum = 0;
+  }
+
+  function startGame(){
+    ensureAudio();
+    sfxStart();
+    resetGame();
+    running = true;
+    startScreen.classList.add('hidden');
+    endScreen.classList.add('hidden');
+    hud.classList.remove('hidden');
+    document.getElementById('qrNote').classList.add('hidden');
+    trackStatus.classList.remove('hidden');
+    requestAnimationFrame(loop);
+  }
+
+  function endGame(won){
+    running = false;
+    hud.classList.add('hidden');
+    trackStatus.classList.add('hidden');
+    sfxOver();
+    finalScore.textContent = score;
+    finalHits.textContent = hits;
+    if(won){
+      endTitle.textContent = 'המגדל ניצל! 🏆';
+      endSub.textContent = 'הגנה מושלמת על מגדל שלום מאיר';
+    } else {
+      endTitle.textContent = 'המגדל נפגע קשות...';
+      endSub.textContent = 'נסו שוב להגן טוב יותר';
+    }
+    endScreen.classList.remove('hidden');
+    document.getElementById('qrNote').classList.remove('hidden');
+  }
+
+  function spawnExplosion(x,y){
+    for(let i=0;i<16;i++){
+      const ang = rand(0,Math.PI*2);
+      const spd = rand(60,220);
+      particles.push({
+        x,y, vx:Math.cos(ang)*spd, vy:Math.sin(ang)*spd,
+        life:1, color: Math.random()<0.5 ? '#ffcf3a' : '#ff6b3d', size: rand(2,5)
+      });
+    }
+  }
+
+  function shootCenter(){
+    if(!running || !mindReady) return;
+    sfxShoot();
+    muzzleFlash = 1;
+
+    let bestIdx=-1, bestDist=9999;
+    for(let i=0;i<ships.length;i++){
+      const s = ships[i];
+      if(!s.alive) continue;
+      const lp = shipLocalPos(s);
+      const p = projectLocal(lp.x, lp.y);
+      if(p.z>1) continue; // behind camera / invalid
+      const d = Math.hypot(p.x-W/2, p.y-H/2);
+      if(d < RETICLE_R && d < bestDist){ bestDist=d; bestIdx=i; }
+    }
+    if(bestIdx>=0){
+      const s = ships[bestIdx];
+      s.alive = false;
+      hits++;
+      score += 10;
+      sfxHit();
+      const lp = shipLocalPos(s);
+      const p = projectLocal(lp.x, lp.y);
+      spawnExplosion(p.x, p.y);
+    }
+  }
+
+  canvas.addEventListener('pointerdown', ()=>{
+    if(!running) return;
+    shootCenter();
+    flashOverlay.style.transition='none';
+    flashOverlay.style.opacity='0.06';
+    requestAnimationFrame(()=>{
+      flashOverlay.style.transition='opacity .15s ease';
+      flashOverlay.style.opacity='0';
+    });
+  });
+
+  function loop(ts){
+    if(!running) return;
+    updateTrackStatusUI(ts);
+
+    const dt = Math.min((ts-lastTick)/1000, 0.05);
+    lastTick = ts;
+    elapsed += dt;
+
+    timerAccum += dt;
+    if(timerAccum>=1){
+      timerAccum -= 1;
+      timeLeft -= 1;
+      if(timeLeft<=0){
+        timeLeft=0;
+        render();
+        endGame(true);
+        return;
+      }
+    }
+
+    spawnInterval = Math.max(650, 1500 - elapsed*30);
+    if(ts - lastSpawn > spawnInterval){
+      lastSpawn = ts;
+      spawnShip();
+    }
+
+    for(const s of ships){
+      if(!s.alive) continue;
+      s.dist -= (s.dist0/s.duration) * dt;
+
+      s.nextFire -= dt;
+      if(s.nextFire<=0 && s.dist>0.08){
+        s.nextFire = rand(1.5, 3);
+        const lp = shipLocalPos(s);
+        const from = projectLocal(lp.x, lp.y);
+        const to = projectLocal(TARGET.x, TARGET.y);
+        laserBeams.push({ x0:from.x, y0:from.y, x1:to.x, y1:to.y, life:1 });
+        sfxLaser();
+      }
+
+      if(s.dist <= 0.05){
+        s.alive = false;
+        lives -= 1;
+        sfxHurt();
+        const lp = shipLocalPos(s);
+        const p = projectLocal(lp.x, lp.y);
+        spawnExplosion(p.x, p.y);
+        shakeScreen();
+        if(lives<=0){
+          render();
+          endGame(false);
+          return;
+        }
+      }
+    }
+    ships = ships.filter(s=>s.alive);
+
+    for(const p of particles){
+      p.x += p.vx*dt; p.y += p.vy*dt;
+      p.vx *= 0.94; p.vy = p.vy*0.94 + 40*dt;
+      p.life -= dt*1.6;
+    }
+    particles = particles.filter(p=>p.life>0);
+
+    for(const l of laserBeams){ l.life -= dt*1.1; }
+    laserBeams = laserBeams.filter(l=>l.life>0);
+
+    muzzleFlash = Math.max(0, muzzleFlash - dt*5);
+
+    render();
+    updateHud();
+    requestAnimationFrame(loop);
+  }
+
+  let shakeT = 0;
+  function shakeScreen(){ shakeT = 0.25; }
+
+  function updateHud(){
+    scoreChip.textContent = score + " נק'";
+    timeChip.textContent = timeLeft;
+    livesChip.textContent = '♥ '.repeat(Math.max(lives,0)).trim() || '—';
+  }
+
+  function drawOutline(){
+    if(!mindReady) return;
+    const stale = !targetVisible;
+    const bc = buildingCorners();
+    ctx.save();
+    ctx.strokeStyle = '#e044ff';
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = '#e044ff';
+    ctx.shadowBlur = 10;
+    ctx.globalAlpha = stale ? 0.4 : 0.85;
+    if(stale) ctx.setLineDash([7,7]);
+    ctx.beginPath();
+    ctx.moveTo(bc.tl.x, bc.tl.y);
+    ctx.lineTo(bc.tr.x, bc.tr.y);
+    ctx.lineTo(bc.br.x, bc.br.y);
+    ctx.lineTo(bc.bl.x, bc.bl.y);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo((bc.tl.x+bc.tr.x)/2, (bc.tl.y+bc.tr.y)/2);
+    ctx.lineTo((bc.bl.x+bc.br.x)/2, (bc.bl.y+bc.br.y)/2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawCrosshair(){
+    const cx=W/2, cy=H/2;
+    ctx.save();
+    ctx.strokeStyle = muzzleFlash>0 ? '#ffffff' : '#2fe6d8';
+    ctx.globalAlpha = 0.9;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = '#2fe6d8';
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.arc(cx,cy, RETICLE_R*(1-muzzleFlash*0.15), 0, Math.PI*2);
+    ctx.stroke();
+    const g = 10;
+    [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dx,dy])=>{
+      ctx.beginPath();
+      ctx.moveTo(cx+dx*(RETICLE_R+4), cy+dy*(RETICLE_R+4));
+      ctx.lineTo(cx+dx*(RETICLE_R+4+g), cy+dy*(RETICLE_R+4+g));
+      ctx.stroke();
+    });
+    ctx.beginPath();
+    ctx.arc(cx,cy,2.5,0,Math.PI*2);
+    ctx.fillStyle = '#2fe6d8';
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function render(){
+    ctx.clearRect(0,0,W,H);
+    if(!mindReady){ return; }
+
+    if(shakeT>0){
+      shakeT -= 0.016;
+      const mag = 6*Math.max(shakeT,0);
+      ctx.save();
+      ctx.translate(rand(-mag,mag), rand(-mag,mag));
+    }
+
+    drawOutline();
+
+    for(const l of laserBeams){
+      ctx.save();
+      ctx.globalAlpha = Math.max(l.life,0)*0.8;
+      ctx.strokeStyle = '#ff5555';
+      ctx.lineWidth = 2;
+      ctx.shadowColor = '#ff5555';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.moveTo(l.x0,l.y0);
+      ctx.lineTo(l.x1,l.y1);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    for(const s of ships){
+      if(!s.alive) continue;
+      const lp = shipLocalPos(s);
+      const p = projectLocal(lp.x, lp.y);
+      if(p.z>1) continue;
+      const scale = Math.max(0.4, Math.min(1.8, 0.5/(s.dist+0.15)));
+      ctx.save();
+      const bob = Math.sin((elapsed*4)+s.wobbleSeed)*3;
+      ctx.translate(p.x, p.y+bob);
+      const facingAngle = Math.atan2(TARGET.y-lp.y, TARGET.x-lp.x)*-1 + Math.PI/2;
+      ctx.rotate(facingAngle);
+      ctx.shadowColor='rgba(0,0,0,0.6)';
+      ctx.shadowBlur=10;
+      if(shipImg.complete && shipImg.naturalWidth){
+        const ar = shipImg.width/shipImg.height;
+        const w = s.size*scale, h = (s.size*scale)/ar;
+        ctx.drawImage(shipImg, -w/2, -h/2, w, h);
+      }
+      ctx.restore();
+    }
+
+    for(const p of particles){
+      ctx.save();
+      ctx.globalAlpha = Math.max(p.life,0);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    if(shakeT>0){ ctx.restore(); }
+
+    drawCrosshair();
+  }
+
+  function idleRender(){
+    if(mindReady){
+      const ts = performance.now();
+      updateTrackStatusUI(ts);
+      ctx.clearRect(0,0,W,H);
+      drawOutline();
+      drawCrosshair();
+    }
+    if(!running) requestAnimationFrame(idleRender);
+  }
+
+  startBtn.addEventListener('click', ()=>{
+    trackStatus.classList.remove('hidden');
+    startGame();
+  });
+  retryBtn.addEventListener('click', ()=>{
+    startGame();
+  });
+  shareBtn.addEventListener('click', ()=>{
+    const text = `הגנתי על מגדל שלום מאיר וצברתי ${score} נקודות במשחק AR של סמינר הקיבוצים! 🚀🏰`;
+    if(navigator.share){
+      navigator.share({text});
+    } else {
+      navigator.clipboard && navigator.clipboard.writeText(text);
+      shareBtn.textContent = 'הועתק! ✔';
+      setTimeout(()=> shareBtn.textContent='שתפו את הניקוד', 1500);
+    }
+  });
+
+  requestAnimationFrame(idleRender);
+  initMindAR();
+})();
+</script>
+</body>
+</html>
